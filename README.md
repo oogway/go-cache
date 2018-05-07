@@ -1,4 +1,4 @@
-# go-cache
+# go-cache [![Build Status](https://travis-ci.org/oogway/go-cache.svg?branch=master)](https://travis-ci.org/oogway/go-cache)
 
 This repository is a hard-fork of [revel-cache](https://github.com/revel/revel/tree/master/cache)
 
