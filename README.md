@@ -16,7 +16,7 @@ Installation
 
 ## Usage
 
-# In-memory
+### In-memory
 
 Example:
 
@@ -80,6 +80,8 @@ func main() {
 
 ```
 
+### Redis
+
 For Redis store just initialize store as follows
 
 
@@ -88,7 +90,6 @@ For Redis store just initialize store as follows
         Host:       "",
         Expiration: time.Hour,
     })
-
 ```
 
 Empty host assumes redis service on local machine (`localhost:6379`)
@@ -96,7 +97,6 @@ Empty host assumes redis service on local machine (`localhost:6379`)
 Following are the options while initializing Redis store
 
 ```
-
     MaxIdle        int
     MaxActive      int
     Protocol       string
