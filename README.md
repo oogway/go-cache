@@ -85,11 +85,11 @@ func main() {
 For Redis store just initialize store as follows
 
 
-```
-    store := cache.NewRedisCache(cache.RedisOpts{
-        Host:       "",
-        Expiration: time.Hour,
-    })
+```go
+store := cache.NewRedisCache(cache.RedisOpts{
+    Host:       "",
+    Expiration: time.Hour,
+})
 ```
 
 Empty host assumes redis service on local machine (`localhost:6379`)
@@ -107,5 +107,4 @@ Following are the options while initializing Redis store
     TimeoutRead    int
     TimeoutWrite   int
     TimeoutIdle    int
-
 ```
