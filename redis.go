@@ -25,7 +25,7 @@ const (
 	defaultTimeoutConnect = 10000
 	defaultTimeoutRead    = 5000
 	defaultTimeoutWrite   = 5000
-	defaultHost           = "localhost"
+	defaultHost           = "localhost:6379"
 	defaultProtocol       = "tcp"
 )
 
