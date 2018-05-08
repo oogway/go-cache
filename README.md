@@ -47,24 +47,6 @@ func main() {
 	store.Get("num", &num)
 	fmt.Println("Number: ", num)
 
-	// Get incremented value
-	incValue, _ := store.Increment("num", 10)
-	fmt.Println("Incremented value: ", incValue)
-
-	// Get decremented value
-	decValue, _ := store.Decrement("num", 1)
-	fmt.Println("Decremented value: ", decValue)
-
-	// Remember Increment/Decrement changes value in memory
-	store.Get("num", &num)
-	fmt.Println("Number in memory: ", num)
-
-	// Beware Increment/Decrement can result to err
-	incValue, err := store.Increment("key", 10)
-	if err != nil {
-		fmt.Println("Error: ", err)
-	}
-
 	// No longer need the item in store? DELETE IT!
 	store.Delete("key")
 
