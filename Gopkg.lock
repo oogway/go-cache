@@ -2,13 +2,13 @@
 
 
 [[projects]]
-  name = "github.com/garyburd/redigo"
+  name = "github.com/gomodule/redigo"
   packages = [
     "internal",
     "redis"
   ]
-  revision = "a69d19351219b6dd56f274f96d85a7014a2ec34e"
-  version = "v1.6.0"
+  revision = "9c11da706d9b7902c6da69c592f75637793fe121"
+  version = "v2.0.0"
 
 [[projects]]
   name = "github.com/patrickmn/go-cache"
@@ -19,6 +19,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6edd6877e57d8f049febd096f006141b312aae0c4d2ebef4224dbb6dac3d0d4c"
+  inputs-digest = "c094f3304a6b1b8d19e45722d29df5f9f8394dd7f11e8a5ab35e52d2a49ebe51"
   solver-name = "gps-cdcl"
   solver-version = 1

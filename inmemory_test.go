@@ -18,11 +18,6 @@ func TestInMemoryCache_TypicalGetSet(t *testing.T) {
 	typicalGetSet(t, newInMemoryCache)
 }
 
-// Test the increment-decrement cases
-func TestInMemoryCache_IncrDecr(t *testing.T) {
-	incrDecr(t, newInMemoryCache)
-}
-
 func TestInMemoryCache_Expiration(t *testing.T) {
 	expiration(t, newInMemoryCache)
 }
@@ -41,4 +36,8 @@ func TestInMemoryCache_Add(t *testing.T) {
 
 func TestInMemoryCache_GetMulti(t *testing.T) {
 	testGetMulti(t, newInMemoryCache)
+}
+
+func TestInMemoryCache_Keys(t *testing.T) {
+	testKeys(t, newInMemoryCache)
 }

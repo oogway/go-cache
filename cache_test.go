@@ -5,7 +5,6 @@
 package cache
 
 import (
-	"math"
 	"testing"
 	"time"
 )
@@ -31,50 +30,6 @@ func typicalGetSet(t *testing.T, newCache cacheFactory) {
 	}
 	if value != "foo" {
 		t.Errorf("Expected to get foo back, got %s", value)
-	}
-}
-
-// Test the increment-decrement cases
-func incrDecr(t *testing.T, newCache cacheFactory) {
-	var err error
-	cache := newCache(t, time.Hour)
-
-	// Normal increment / decrement operation.
-	if err = cache.Set("int", 10, ForEverNeverExpiry); err != nil {
-		t.Errorf("Error setting int: %s", err)
-	}
-	time.Sleep(time.Second)
-	newValue, err := cache.Increment("int", 50)
-	if err != nil {
-		t.Errorf("Error incrementing int: %s", err)
-	}
-	if newValue != 60 {
-		t.Errorf("Expected 60, was %d", newValue)
-	}
-
-	if newValue, err = cache.Decrement("int", 50); err != nil {
-		t.Errorf("Error decrementing: %s", err)
-	}
-	if newValue != 10 {
-		t.Errorf("Expected 10, was %d", newValue)
-	}
-
-	// Increment wraparound
-	newValue, err = cache.Increment("int", math.MaxUint64-5)
-	if err != nil {
-		t.Errorf("Error wrapping around: %s", err)
-	}
-	if newValue != 4 {
-		t.Errorf("Expected wraparound 4, got %d", newValue)
-	}
-
-	// Decrement capped at 0
-	newValue, err = cache.Decrement("int", 25)
-	if err != nil {
-		t.Errorf("Error decrementing below 0: %s", err)
-	}
-	if newValue != 0 {
-		t.Errorf("Expected capped at 0, got %d", newValue)
 	}
 }
 
@@ -135,16 +90,6 @@ func emptyCache(t *testing.T, newCache cacheFactory) {
 	err = cache.Delete("notexist")
 	if err != ErrCacheMiss {
 		t.Errorf("Expected ErrCacheMiss for non-existent key: %s", err)
-	}
-
-	_, err = cache.Increment("notexist", 1)
-	if err != ErrCacheMiss {
-		t.Errorf("Expected cache miss incrementing non-existent key: %s", err)
-	}
-
-	_, err = cache.Decrement("notexist", 1)
-	if err != ErrCacheMiss {
-		t.Errorf("Expected cache miss decrementing non-existent key: %s", err)
 	}
 }
 
@@ -249,5 +194,46 @@ func testGetMulti(t *testing.T, newCache cacheFactory) {
 	var foo struct{ Bar string }
 	if err = g.Get("foo", &foo); err != nil || foo.Bar != "baz" {
 		t.Errorf("Error getting foo: %s / %v", err, foo)
+	}
+}
+
+func testKeys(t *testing.T, newCache cacheFactory) {
+	cache := newCache(t, time.Hour)
+
+	m := map[string]interface{}{
+		"str": "foo",
+		"num": 42,
+		"foo": struct{ Bar string }{"baz"},
+	}
+
+	var keys []string
+	for key, value := range m {
+		keys = append(keys, key)
+		if err := cache.Set(key, value, time.Second*30); err != nil {
+			t.Errorf("Error setting a value: %s", err)
+		}
+	}
+
+	items, err := cache.Keys()
+	if err != nil {
+		t.Errorf("Error in Keys: %s", err)
+	}
+
+	expected := []string{"str", "num", "foo"}
+	if len(items) != len(expected) {
+		t.Errorf("Mismatching number of keys: %v != %v ", items, expected)
+	}
+
+	match := 0
+	for _, i := range expected {
+		for _, j := range items {
+			if j == i {
+				match++
+			}
+		}
+	}
+
+	if match != len(expected) {
+		t.Errorf("Mismatching number of keys: %v != %v ", items, expected)
 	}
 }

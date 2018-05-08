@@ -5,8 +5,7 @@
 package cache
 
 import (
-	"fmt"
-	"reflect"
+	"encoding/json"
 	"time"
 
 	"sync"
@@ -32,13 +31,12 @@ func (c InMemoryCache) Get(key string, ptrValue interface{}) error {
 		return ErrCacheMiss
 	}
 
-	v := reflect.ValueOf(ptrValue)
-	if v.Type().Kind() == reflect.Ptr && v.Elem().CanSet() {
-		v.Elem().Set(reflect.ValueOf(value))
-		return nil
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return err
 	}
 
-	return fmt.Errorf("revel/cache: attempt to get %s, but can not set value %v", key, v)
+	return json.Unmarshal(bytes, ptrValue)
 }
 
 func (c InMemoryCache) GetMulti(keys ...string) (Getter, error) {
@@ -72,6 +70,21 @@ func (c InMemoryCache) Replace(key string, value interface{}, expires time.Durat
 	return nil
 }
 
+func (c InMemoryCache) Keys() ([]string, error) {
+	items := func() map[string]cache.Item {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.cache.Items()
+	}()
+
+	keys := make([]string, 0, len(items))
+	for k := range items {
+		keys = append(keys, k)
+	}
+
+	return keys, nil
+}
+
 func (c InMemoryCache) Delete(key string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -82,81 +95,10 @@ func (c InMemoryCache) Delete(key string) error {
 	return nil
 }
 
-func (c InMemoryCache) Increment(key string, n uint64) (newValue uint64, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, found := c.cache.Get(key); !found {
-		return 0, ErrCacheMiss
-	}
-	if err = c.cache.Increment(key, int64(n)); err != nil {
-		return
-	}
-
-	return c.convertTypeToUint64(key)
-}
-
-func (c InMemoryCache) Decrement(key string, n uint64) (newValue uint64, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if nv, err := c.convertTypeToUint64(key); err != nil {
-		return 0, err
-	} else {
-		// Stop from going below zero
-		if n > nv {
-			n = nv
-		}
-	}
-	if err = c.cache.Decrement(key, int64(n)); err != nil {
-		return
-	}
-
-	return c.convertTypeToUint64(key)
-}
-
 func (c InMemoryCache) Flush() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.cache.Flush()
 	return nil
-}
-
-// Fetches and returns the converted type to a uint64
-func (c InMemoryCache) convertTypeToUint64(key string) (newValue uint64, err error) {
-	v, found := c.cache.Get(key)
-	if !found {
-		return newValue, ErrCacheMiss
-	}
-
-	switch v.(type) {
-	case int:
-		newValue = uint64(v.(int))
-	case int8:
-		newValue = uint64(v.(int8))
-	case int16:
-		newValue = uint64(v.(int16))
-	case int32:
-		newValue = uint64(v.(int32))
-	case int64:
-		newValue = uint64(v.(int64))
-	case uint:
-		newValue = uint64(v.(uint))
-	case uintptr:
-		newValue = uint64(v.(uintptr))
-	case uint8:
-		newValue = uint64(v.(uint8))
-	case uint16:
-		newValue = uint64(v.(uint16))
-	case uint32:
-		newValue = uint64(v.(uint32))
-	case uint64:
-		newValue = uint64(v.(uint64))
-	case float32:
-		newValue = uint64(v.(float32))
-	case float64:
-		newValue = uint64(v.(float64))
-	default:
-		err = ErrInvalidValue
-	}
-	return
 }
