@@ -39,10 +39,6 @@ func TestRedisCache_TypicalGetSet(t *testing.T) {
 	typicalGetSet(t, newRedisCache)
 }
 
-func TestRedisCache_IncrDecr(t *testing.T) {
-	incrDecr(t, newRedisCache)
-}
-
 func TestRedisCache_Expiration(t *testing.T) {
 	expiration(t, newRedisCache)
 }
@@ -61,4 +57,8 @@ func TestRedisCache_Add(t *testing.T) {
 
 func TestRedisCache_GetMulti(t *testing.T) {
 	testGetMulti(t, newRedisCache)
+}
+
+func TestRedisCache_Keys(t *testing.T) {
+	testKeys(t, newRedisCache)
 }

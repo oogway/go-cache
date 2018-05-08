@@ -95,24 +95,11 @@ type Cache interface {
 	//   - an implementation specific error otherwise
 	Replace(key string, value interface{}, expires time.Duration) error
 
-	// Increment the value stored at the given key by the given amount.
-	// The value silently wraps around upon exceeding the uint64 range.
-	//
-	// Returns the new counter value if the operation was successful, or:
-	//   - ErrCacheMiss if the key was not found in the cache
-	//   - an implementation specific error otherwise
-	Increment(key string, n uint64) (newValue uint64, err error)
-
-	// Decrement the value stored at the given key by the given amount.
-	// The value is capped at 0 on underflow, with no error returned.
-	//
-	// Returns the new counter value if the operation was successful, or:
-	//   - ErrCacheMiss if the key was not found in the cache
-	//   - an implementation specific error otherwise
-	Decrement(key string, n uint64) (newValue uint64, err error)
-
 	// Expire all cache entries immediately.
 	// This is not implemented for the memcached cache (intentionally).
 	// Returns an implementation specific error if the operation failed.
 	Flush() error
+
+	// Get all currently set keys. This can be super slow so use with care.
+	Keys() ([]string, error)
 }
