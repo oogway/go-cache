@@ -11,6 +11,12 @@
   version = "v2.0.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/meson10/highbrow"
+  packages = ["."]
+  revision = "88261ca7babdb56d0a2b44e63a1c99ef62a94494"
+
+[[projects]]
   name = "github.com/patrickmn/go-cache"
   packages = ["."]
   revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
@@ -19,6 +25,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c094f3304a6b1b8d19e45722d29df5f9f8394dd7f11e8a5ab35e52d2a49ebe51"
+  inputs-digest = "e690f3c1a62b4b058c6746b060ac377aa5100facf6f50ff532a2f7c2cc56e66c"
   solver-name = "gps-cdcl"
   solver-version = 1
