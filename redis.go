@@ -10,6 +10,9 @@ import (
 	"encoding/json"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/meson10/highbrow"
+	"net"
+	"log"
 )
 
 // RedisCache wraps the Redis client to meet the Cache interface.
@@ -27,6 +30,7 @@ const (
 	defaultTimeoutWrite   = 5000
 	defaultHost           = "localhost:6379"
 	defaultProtocol       = "tcp"
+	defaultRetryThreshold = 5
 )
 
 type RedisOpts struct {
@@ -78,8 +82,6 @@ func (r RedisOpts) padDefaults() RedisOpts {
 	return r
 }
 
-// NewRedisCache returns a new RedisCache with given parameters
-// until redigo supports sharding/clustering, only one host will be in hostList
 func NewRedisCache(opts RedisOpts) RedisCache {
 	opts = opts.padDefaults()
 	var pool = &redis.Pool{
@@ -90,10 +92,28 @@ func NewRedisCache(opts RedisOpts) RedisCache {
 			toc := time.Millisecond * time.Duration(opts.TimeoutConnect)
 			tor := time.Millisecond * time.Duration(opts.TimeoutRead)
 			tow := time.Millisecond * time.Duration(opts.TimeoutWrite)
-			c, err := redis.Dial(opts.Protocol, opts.Host,
-				redis.DialConnectTimeout(toc),
-				redis.DialReadTimeout(tor),
-				redis.DialWriteTimeout(tow))
+
+			var c redis.Conn
+			var err error
+
+			highbrow.Try(defaultRetryThreshold, func() error {
+				c, err = redis.Dial(opts.Protocol, opts.Host,
+					redis.DialConnectTimeout(toc),
+					redis.DialReadTimeout(tor),
+					redis.DialWriteTimeout(tow))
+
+				if err == nil {
+					return nil
+				}
+
+				if _, ok := err.(net.Error); ok {
+					log.Printf("Network Error Occured: %v, retrying...", err)
+					return err
+				}
+
+				return nil
+			})
+
 			if err != nil {
 				return nil, err
 			}
