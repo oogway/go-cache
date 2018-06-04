@@ -63,6 +63,9 @@ type Cache interface {
 	//   - an implementation specific error otherwise
 	Set(key string, value interface{}, expires time.Duration) error
 
+	// SetFields will atomically set a field of a Hash.
+	SetFields(key string, value map[string]interface{}, expires time.Duration) error
+
 	// Get the content associated multiple keys at once.  On success, the caller
 	// may decode the values one at a time from the returned Getter.
 	//

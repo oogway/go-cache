@@ -2,13 +2,25 @@
 
 
 [[projects]]
-  name = "github.com/gomodule/redigo"
+  name = "github.com/go-redis/redis"
   packages = [
+    ".",
     "internal",
-    "redis"
+    "internal/consistenthash",
+    "internal/hashtag",
+    "internal/pool",
+    "internal/proto",
+    "internal/singleflight",
+    "internal/util"
   ]
-  revision = "9c11da706d9b7902c6da69c592f75637793fe121"
-  version = "v2.0.0"
+  revision = "0f9028adf0837cf93c9705817493e5f6997cf026"
+  version = "v6.11.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/meson10/highbrow"
+  packages = ["."]
+  revision = "88261ca7babdb56d0a2b44e63a1c99ef62a94494"
 
 [[projects]]
   name = "github.com/patrickmn/go-cache"
@@ -19,6 +31,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c094f3304a6b1b8d19e45722d29df5f9f8394dd7f11e8a5ab35e52d2a49ebe51"
+  inputs-digest = "924140c1ec2206f25a78fdc2b257940e7c871faac2f76a7066ee0e8faa09bc92"
   solver-name = "gps-cdcl"
   solver-version = 1

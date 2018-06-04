@@ -47,6 +47,10 @@ func TestRedisCache_EmptyCache(t *testing.T) {
 	emptyCache(t, newRedisCache)
 }
 
+func TestRedisCache_SetFields(t *testing.T) {
+	testSetFields(t, newRedisCache)
+}
+
 func TestRedisCache_Replace(t *testing.T) {
 	testReplace(t, newRedisCache)
 }
