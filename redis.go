@@ -30,6 +30,7 @@ const (
 	defaultTimeoutWrite   = 5000
 	defaultHost           = "localhost:6379"
 	defaultProtocol       = "tcp"
+	defaultRetryThreshold = 5
 )
 
 type RedisOpts struct {

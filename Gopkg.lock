@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/bmizerany/assert"
+  packages = ["."]
+  revision = "b7ed37b82869576c289d7d97fb2bbd8b64a0cb28"
+
+[[projects]]
   name = "github.com/go-redis/redis"
   packages = [
     ".",
@@ -15,6 +21,18 @@
   ]
   revision = "0f9028adf0837cf93c9705817493e5f6997cf026"
   version = "v6.11.0"
+
+[[projects]]
+  name = "github.com/kr/pretty"
+  packages = ["."]
+  revision = "73f6ac0b30a98e433b289500d779f50c1a6f0712"
+  version = "v0.1.0"
+
+[[projects]]
+  name = "github.com/kr/text"
+  packages = ["."]
+  revision = "e2ffdb16a802fe2bb95e2e35ff34f0e53aeef34f"
+  version = "v0.1.0"
 
 [[projects]]
   branch = "master"
@@ -31,6 +49,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "924140c1ec2206f25a78fdc2b257940e7c871faac2f76a7066ee0e8faa09bc92"
+  inputs-digest = "85cf51fad7bcd074369fc5382ef40301ad416dfa74ace6ab3d5326da7a82e42c"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -11,7 +11,7 @@ Motivation to do this:
 
 Installation
 
-    $ go get https://github.com/oogway/go-cache
+    $ go get github.com/oogway/go-cache
 
 
 ## Usage
