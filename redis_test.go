@@ -6,8 +6,12 @@ package cache
 
 import (
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/bmizerany/assert"
 )
 
 // These tests require redis server running on localhost:6379 (the default)
@@ -65,4 +69,40 @@ func TestRedisCache_GetMulti(t *testing.T) {
 
 func TestRedisCache_Keys(t *testing.T) {
 	testKeys(t, newRedisCache)
+}
+
+func TestRedisCache_LockRetry(t *testing.T) {
+
+	cache := newRedisCache(t, testExpiryTime)
+	x, ok := cache.(*RedisCache)
+	if !ok {
+		t.Fatalf("Cannot convert racache")
+	}
+
+	x.lockRetries = 1
+
+	var counter int64
+	var errors int64
+
+	var wg sync.WaitGroup
+	for _, ix := range []int{1, 2} {
+		wg.Add(1)
+
+		go func(ix int) {
+			defer wg.Done()
+
+			if err := x.lockRetry("mohan", func() error {
+				time.Sleep(2 * time.Second)
+				return nil
+			}); err != nil {
+				atomic.AddInt64(&errors, 1)
+			} else {
+				atomic.AddInt64(&counter, 1)
+			}
+		}(ix)
+	}
+
+	wg.Wait()
+	assert.Equal(t, int64(1), counter)
+	assert.Equal(t, int64(1), errors)
 }
