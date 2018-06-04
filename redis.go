@@ -19,6 +19,7 @@ import (
 type RedisCache struct {
 	pool              *redis.Client
 	defaultExpiration time.Duration
+	lockRetries       int
 }
 
 const (
@@ -104,7 +105,7 @@ func NewRedisCache(opts RedisOpts) *RedisCache {
 	}
 
 	c := redis.NewClient(opt)
-	return &RedisCache{pool: c}
+	return &RedisCache{pool: c, lockRetries: lockRetries}
 }
 
 func (c *RedisCache) Set(key string, value interface{}, expires time.Duration) error {
@@ -115,10 +116,12 @@ func (c *RedisCache) Set(key string, value interface{}, expires time.Duration) e
 	return c.pool.Set(key, b, expires).Err()
 }
 
+const lockRetries = 5
+
 func (c *RedisCache) lockRetry(key string, op func() error) error {
 	var breakErr error
 
-	highbrow.Try(5, func() error {
+	err := highbrow.Try(c.lockRetries, func() error {
 		lockKey := fmt.Sprintf("%v-op", key)
 		ret, err := c.pool.SetNX(lockKey, "1", 5*time.Second).Result()
 		if err != nil {
@@ -138,6 +141,9 @@ func (c *RedisCache) lockRetry(key string, op func() error) error {
 		return nil
 	})
 
+	if breakErr == nil {
+		return err
+	}
 	return breakErr
 }
 
