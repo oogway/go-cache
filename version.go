@@ -1,4 +1,4 @@
 package cache
 
 // VERSION of go-cache.
-const VERSION = "0.1"
+const VERSION = "0.2"

@@ -18,6 +18,10 @@ func TestInMemoryCache_TypicalGetSet(t *testing.T) {
 	typicalGetSet(t, newInMemoryCache)
 }
 
+func TestInMemoryCache_SetFields(t *testing.T) {
+	testSetFields(t, newInMemoryCache)
+}
+
 func TestInMemoryCache_Expiration(t *testing.T) {
 	expiration(t, newInMemoryCache)
 }

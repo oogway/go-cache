@@ -14,12 +14,17 @@ import (
 )
 
 type InMemoryCache struct {
-	cache cache.Cache  // Only expose the methods we want to make available
-	mu    sync.RWMutex // For increment / decrement prevent reads and writes
+	cache             cache.Cache   // Only expose the methods we want to make available
+	mu                sync.RWMutex  // For increment / decrement prevent reads and writes
+	defaultExpiration time.Duration // DefaultExpiration.
 }
 
 func NewInMemoryCache(defaultExpiration time.Duration) InMemoryCache {
-	return InMemoryCache{cache: *cache.New(defaultExpiration, time.Minute), mu: sync.RWMutex{}}
+	return InMemoryCache{
+		cache:             *cache.New(defaultExpiration, time.Minute),
+		mu:                sync.RWMutex{},
+		defaultExpiration: defaultExpiration,
+	}
 }
 
 func (c InMemoryCache) Get(key string, ptrValue interface{}) error {
@@ -41,6 +46,33 @@ func (c InMemoryCache) Get(key string, ptrValue interface{}) error {
 
 func (c InMemoryCache) GetMulti(keys ...string) (Getter, error) {
 	return c, nil
+}
+
+func (c InMemoryCache) SetFields(key string, value map[string]interface{}, expires time.Duration) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	existing := map[string]interface{}{}
+	v, found := c.cache.Get(key)
+	if !found {
+		return ErrNotStored
+	}
+
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(bytes, &existing); err != nil {
+		return err
+	}
+
+	for k, v := range value {
+		existing[k] = v
+	}
+
+	c.cache.Set(key, existing, expires)
+	return nil
 }
 
 func (c InMemoryCache) Set(key string, value interface{}, expires time.Duration) error {
@@ -88,9 +120,6 @@ func (c InMemoryCache) Keys() ([]string, error) {
 func (c InMemoryCache) Delete(key string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if _, found := c.cache.Get(key); !found {
-		return ErrCacheMiss
-	}
 	c.cache.Delete(key)
 	return nil
 }

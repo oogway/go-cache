@@ -5,6 +5,7 @@
 package cache
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -13,13 +14,15 @@ import (
 // They should pass for all implementations.
 type cacheFactory func(*testing.T, time.Duration) Cache
 
+const testExpiryTime = time.Duration(1) * time.Millisecond
+
 // Test typical cache interactions
 func typicalGetSet(t *testing.T, newCache cacheFactory) {
 	var err error
 	cache := newCache(t, time.Hour)
 
 	value := "foo"
-	if err = cache.Set("value", value, DefaultExpiryTime); err != nil {
+	if err = cache.Set("value", value, testExpiryTime); err != nil {
 		t.Errorf("Error setting a value: %s", err)
 	}
 
@@ -37,13 +40,14 @@ func expiration(t *testing.T, newCache cacheFactory) {
 	// memcached does not support expiration times less than 1 second.
 	var err error
 	cache := newCache(t, time.Second)
-	// Test Set w/ DefaultExpiryTime
+	// Test Set w/ testExpiryTime
 	value := 10
-	if err = cache.Set("int", value, DefaultExpiryTime); err != nil {
+	if err = cache.Set("int", value, testExpiryTime); err != nil {
 		t.Errorf("Set failed: %s", err)
 	}
 	time.Sleep(2 * time.Second)
 	if err = cache.Get("int", &value); err != ErrCacheMiss {
+		t.Log(value)
 		t.Errorf("Expected CacheMiss, but got: %s", err)
 	}
 
@@ -60,7 +64,7 @@ func expiration(t *testing.T, newCache cacheFactory) {
 	if err = cache.Set("int", value, time.Hour); err != nil {
 		t.Errorf("Set failed: %s", err)
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	if err = cache.Get("int", &value); err != nil {
 		t.Errorf("Expected to get the value, but got: %s", err)
 	}
@@ -69,7 +73,7 @@ func expiration(t *testing.T, newCache cacheFactory) {
 	if err = cache.Set("int", value, ForEverNeverExpiry); err != nil {
 		t.Errorf("Set failed: %s", err)
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	if err = cache.Get("int", &value); err != nil {
 		t.Errorf("Expected to get the value, but got: %s", err)
 	}
@@ -84,12 +88,12 @@ func emptyCache(t *testing.T, newCache cacheFactory) {
 		t.Errorf("Error expected for non-existent key")
 	}
 	if err != ErrCacheMiss {
-		t.Errorf("Expected ErrCacheMiss for non-existent key: %s", err)
+		t.Errorf("Expected ErrCacheMiss on GET for non-existent key: %s", err)
 	}
 
 	err = cache.Delete("notexist")
-	if err != ErrCacheMiss {
-		t.Errorf("Expected ErrCacheMiss for non-existent key: %s", err)
+	if err != nil {
+		t.Errorf("Expected nil on DELETE for non-existent key: %s", err)
 	}
 }
 
@@ -157,6 +161,58 @@ func testAdd(t *testing.T, newCache cacheFactory) {
 	if i != 3 {
 		t.Errorf("Expected 3, got: %d", i)
 	}
+}
+
+func testSetFields(t *testing.T, newCache cacheFactory) {
+	t.Run("HMSet in a valid hash", func(t *testing.T) {
+		var err error
+		cache := newCache(t, time.Hour)
+		value := map[string]interface{}{"field": "foo"}
+		if err = cache.Set("value", value, time.Hour); err != nil {
+			t.Errorf("Error setting a value: %s", err)
+		}
+
+		value2 := map[string]interface{}{"field2": 2}
+		err = cache.SetFields("value", value2, time.Hour)
+		if err != nil {
+			t.Errorf("Error setting a value: %s", err)
+		}
+
+		var i map[string]interface{}
+		err = cache.Get("value", &i)
+		if err != nil {
+			t.Errorf("Cannot get %v, that was set", value)
+		}
+
+		t.Log(i)
+
+		if v, ok := i["field2"]; !ok {
+			t.Error("Must find field2 set in the Hash")
+		} else {
+			v2 := 0
+			b, _ := json.Marshal(v)
+			json.Unmarshal(b, &v2)
+			if v2 != 2 {
+				t.Errorf("Inner field value must be 2. Got %v", v2)
+			}
+		}
+	})
+
+	t.Run("HMSet when value is not a Hash", func(t *testing.T) {
+		var err error
+		cache := newCache(t, time.Hour)
+
+		value := 2
+		if err = cache.Set("value2", value, testExpiryTime); err != nil {
+			t.Errorf("Error setting a value: %s", err)
+		}
+
+		field2 := "field2"
+		err = cache.SetFields("value2", map[string]interface{}{field2: 2}, time.Hour)
+		if err == nil {
+			t.Errorf("Should have returned an Error")
+		}
+	})
 }
 
 func testGetMulti(t *testing.T, newCache cacheFactory) {

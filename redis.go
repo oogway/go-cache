@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"encoding/json"
+	"errors"
+	"fmt"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/meson10/highbrow"
-	"net"
-	"log"
 )
 
 // RedisCache wraps the Redis client to meet the Cache interface.
 type RedisCache struct {
-	pool              *redis.Pool
+	pool              *redis.Client
 	defaultExpiration time.Duration
 }
 
@@ -82,227 +82,161 @@ func (r RedisOpts) padDefaults() RedisOpts {
 	return r
 }
 
-func NewRedisCache(opts RedisOpts) RedisCache {
+// NewRedisCache returns a new RedisCache with given parameters
+// until redigo supports sharding/clustering, only one host will be in hostList
+func NewRedisCache(opts RedisOpts) *RedisCache {
 	opts = opts.padDefaults()
-	var pool = &redis.Pool{
-		MaxIdle:     opts.MaxIdle,
-		MaxActive:   opts.MaxActive,
-		IdleTimeout: time.Duration(opts.TimeoutIdle) * time.Second,
-		Dial: func() (redis.Conn, error) {
-			toc := time.Millisecond * time.Duration(opts.TimeoutConnect)
-			tor := time.Millisecond * time.Duration(opts.TimeoutRead)
-			tow := time.Millisecond * time.Duration(opts.TimeoutWrite)
-
-			var c redis.Conn
-			var err error
-
-			highbrow.Try(defaultRetryThreshold, func() error {
-				c, err = redis.Dial(opts.Protocol, opts.Host,
-					redis.DialConnectTimeout(toc),
-					redis.DialReadTimeout(tor),
-					redis.DialWriteTimeout(tow))
-
-				if err == nil {
-					return nil
-				}
-
-				if _, ok := err.(net.Error); ok {
-					log.Printf("Network Error Occured: %v, retrying...", err)
-					return err
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				return nil, err
-			}
-			if len(opts.Password) > 0 {
-				if _, err = c.Do("AUTH", opts.Password); err != nil {
-					_ = c.Close()
-					return nil, err
-				}
-			} else {
-				// check with PING
-				if _, err = c.Do("PING"); err != nil {
-					_ = c.Close()
-					return nil, err
-				}
-			}
-			return c, err
-		},
-		// custom connection test method
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
-		},
-	}
-	return RedisCache{pool, opts.Expiration}
-}
-
-func (c RedisCache) Set(key string, value interface{}, expires time.Duration) error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-	return c.invoke(conn.Do, key, value, expires)
-}
-
-func (c RedisCache) Add(key string, value interface{}, expires time.Duration) error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	existed, err := exists(conn, key)
-	if err != nil {
-		return err
-	} else if existed {
-		return ErrNotStored
-	}
-	return c.invoke(conn.Do, key, value, expires)
-}
-
-func (c RedisCache) Replace(key string, value interface{}, expires time.Duration) error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	existed, err := exists(conn, key)
-	if err != nil {
-		return err
-	} else if !existed {
-		return ErrNotStored
+	toc := time.Millisecond * time.Duration(opts.TimeoutConnect)
+	tor := time.Millisecond * time.Duration(opts.TimeoutRead)
+	tow := time.Millisecond * time.Duration(opts.TimeoutWrite)
+	toi := time.Duration(opts.TimeoutIdle) * time.Second
+	opt := &redis.Options{
+		Addr:               opts.Host,
+		DB:                 0,
+		DialTimeout:        toc,
+		ReadTimeout:        tor,
+		WriteTimeout:       tow,
+		PoolSize:           opts.MaxActive,
+		PoolTimeout:        30 * time.Second,
+		IdleTimeout:        toi,
+		Password:           opts.Password,
+		IdleCheckFrequency: 500 * time.Millisecond,
 	}
 
-	err = c.invoke(conn.Do, key, value, expires)
-	if value == nil {
-		return ErrNotStored
-	}
-	return err
+	c := redis.NewClient(opt)
+	return &RedisCache{pool: c}
 }
 
-func (c RedisCache) Get(key string, ptrValue interface{}) error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-	raw, err := conn.Do("GET", key)
-	if err != nil {
-		return err
-	} else if raw == nil {
-		return ErrCacheMiss
-	}
-	item, err := redis.Bytes(raw, err)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(item, ptrValue)
-}
-
-func generalizeStringSlice(strs []string) []interface{} {
-	ret := make([]interface{}, len(strs))
-	for i, str := range strs {
-		ret[i] = str
-	}
-	return ret
-}
-
-func (c RedisCache) GetMulti(keys ...string) (Getter, error) {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	items, err := redis.Values(conn.Do("MGET", generalizeStringSlice(keys)...))
-	if err != nil {
-		return nil, err
-	} else if items == nil {
-		return nil, ErrCacheMiss
-	}
-
-	m := make(map[string][]byte)
-	for i, key := range keys {
-		m[key] = nil
-		if i < len(items) && items[i] != nil {
-			s, ok := items[i].([]byte)
-			if ok {
-				m[key] = s
-			}
-		}
-	}
-	return RedisItemMapGetter(m), nil
-}
-
-func exists(conn redis.Conn, key string) (bool, error) {
-	return redis.Bool(conn.Do("EXISTS", key))
-}
-
-func (c RedisCache) Delete(key string) error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-	existed, err := redis.Bool(conn.Do("DEL", key))
-	if err == nil && !existed {
-		err = ErrCacheMiss
-	}
-	return err
-}
-
-func (c RedisCache) Keys() ([]string, error) {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	return redis.Strings(conn.Do("KEYS", "*"))
-}
-
-
-func (c RedisCache) Flush() error {
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-	_, err := conn.Do("FLUSHALL")
-	return err
-}
-
-func (c RedisCache) invoke(f func(string, ...interface{}) (interface{}, error),
-	key string, value interface{}, expires time.Duration) error {
-
-	switch expires {
-	case DefaultExpiryTime:
-		expires = c.defaultExpiration
-	case ForEverNeverExpiry:
-		expires = time.Duration(0)
-	}
-
+func (c *RedisCache) Set(key string, value interface{}, expires time.Duration) error {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	conn := c.pool.Get()
-	defer func() {
-		_ = conn.Close()
-	}()
-	if expires > 0 {
-		_, err = f("SETEX", key, int32(expires/time.Second), b)
+	return c.pool.Set(key, b, expires).Err()
+}
+
+func (c *RedisCache) lockRetry(key string, op func() error) error {
+	var breakErr error
+
+	highbrow.Try(5, func() error {
+		lockKey := fmt.Sprintf("%v-op", key)
+		ret, err := c.pool.SetNX(lockKey, "1", 5*time.Second).Result()
+		if err != nil {
+			breakErr = err
+			return nil
+		}
+
+		if !ret {
+			return errors.New("Cannot get Lock. Retrying.")
+		}
+
+		defer func() {
+			c.pool.Del(lockKey)
+		}()
+
+		breakErr = op()
+		return nil
+	})
+
+	return breakErr
+}
+
+func (c *RedisCache) Add(key string, value interface{}, expires time.Duration) error {
+	return c.lockRetry(key, func() error {
+		exists, err := c.pool.Exists(key).Result()
+		if err != nil {
+			return err
+		}
+
+		if exists == 0 {
+			return c.pool.Set(key, value, expires).Err()
+		}
+
+		return ErrNotStored
+	})
+}
+
+func (c *RedisCache) SetFields(key string, value map[string]interface{}, expires time.Duration) error {
+	return c.lockRetry(key, func() error {
+		var ptrValue map[string]interface{}
+		if err := c.Get(key, &ptrValue); err != nil {
+			return err
+		}
+
+		for k, v := range value {
+			ptrValue[k] = v
+		}
+
+		return c.Set(key, value, expires)
+	})
+}
+
+func (c *RedisCache) Replace(key string, value interface{}, expires time.Duration) error {
+	return c.lockRetry(key, func() error {
+		exists, err := c.pool.Exists(key).Result()
+		if err != nil {
+			return err
+		}
+
+		if exists == 0 {
+			return ErrNotStored
+		}
+
+		return c.pool.Set(key, value, expires).Err()
+	})
+
+}
+
+func (c *RedisCache) Get(key string, ptrValue interface{}) error {
+	b, err := c.pool.Get(key).Bytes()
+	if err == redis.Nil {
+		return ErrCacheMiss
+	}
+
+	if err != nil {
 		return err
 	}
-	_, err = f("SET", key, b)
-	return err
+
+	return json.Unmarshal(b, ptrValue)
+}
+
+func (c *RedisCache) GetMulti(keys ...string) (Getter, error) {
+	res, err := c.pool.MGet(keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) == 0 {
+		return nil, ErrCacheMiss
+	}
+
+	m := make(map[string]string)
+	for ix, key := range keys {
+		m[key] = res[ix].(string)
+	}
+	return RedisItemMapGetter(m), nil
+}
+
+func (c *RedisCache) Delete(key string) error {
+	return c.pool.Del(key).Err()
+}
+
+func (c *RedisCache) Keys() ([]string, error) {
+	return c.pool.Keys("*").Result()
+}
+
+func (c *RedisCache) Flush() error {
+	return c.pool.FlushAll().Err()
 }
 
 // RedisItemMapGetter implements a Getter on top of the returned item map.
-type RedisItemMapGetter map[string][]byte
+type RedisItemMapGetter map[string]string
 
 func (g RedisItemMapGetter) Get(key string, ptrValue interface{}) error {
 	item, ok := g[key]
 	if !ok {
 		return ErrCacheMiss
 	}
-	return json.Unmarshal(item, ptrValue)
+
+	return json.Unmarshal([]byte(item), ptrValue)
 }
